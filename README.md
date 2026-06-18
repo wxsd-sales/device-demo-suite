@@ -2,6 +2,8 @@
 
 Built around Webex Control Hub APIs and RoomOS devices. Each demo lives in its own folder and can run independently.
 
+[![Vidcast Overview](https://github.com/user-attachments/assets/a4d42315-5ea6-4a1e-b080-496abe5e55f0)](https://app.vidcast.io/share/1ec61338-9263-4e20-95c7-87cb24dfbdf3)
+
 ## Demos
 
 | Demo | Folder | Port | Description |
