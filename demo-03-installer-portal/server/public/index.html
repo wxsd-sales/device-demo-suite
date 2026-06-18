@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Installer Portal — Single Pane Demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; background: #f5f5f5; }
+    header { background: #742774; color: white; padding: 1rem; }
+    header h1 { margin: 0; font-size: 1.1rem; }
+    header p { margin: 0.25rem 0 0; opacity: 0.85; font-size: 0.85rem; }
+    main { max-width: 480px; margin: 0 auto; padding: 1rem; }
+    .card { background: white; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .breadcrumb { font-size: 0.8rem; color: #666; margin-bottom: 0.5rem; }
+    .breadcrumb a { color: #742774; cursor: pointer; text-decoration: none; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li.item { padding: 0.75rem; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+    li.item:hover { background: #faf5fa; }
+    li.item:last-child { border-bottom: none; }
+    .item-main { flex: 1; min-width: 0; }
+    .item-sub { font-size: 0.75rem; color: #888; margin-top: 0.15rem; }
+    .chevron { color: #999; flex-shrink: 0; }
+    .badge { font-size: 0.68rem; font-weight: 600; padding: 0.2rem 0.45rem; border-radius: 999px; white-space: nowrap; }
+    .badge-empty { background: #dff6dd; color: #107c10; }
+    .badge-occupied { background: #eee; color: #666; }
+    .code-box { background: #1e1e1e; color: #4ec9b0; padding: 1rem; border-radius: 4px; font-family: monospace; font-size: 1.25rem; text-align: center; letter-spacing: 0.1em; margin: 1rem 0; }
+    button, .btn { background: #742774; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; cursor: pointer; width: 100%; font-size: 1rem; display: block; text-align: center; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: #666; margin-top: 0.5rem; }
+    button.danger { background: #a4262c; margin-top: 0.5rem; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .stat { background: #faf5fa; padding: 0.75rem; border-radius: 4px; text-align: center; }
+    .stat .num { font-size: 1.5rem; font-weight: bold; color: #742774; }
+    .stat .label { font-size: 0.75rem; color: #666; }
+    .error { color: #c0392b; padding: 0.75rem; background: #fdecea; border-radius: 4px; font-size: 0.85rem; }
+    .info { color: #444; padding: 0.75rem; background: #f3f2f1; border-radius: 4px; font-size: 0.85rem; line-height: 1.45; }
+    .device-meta { font-size: 0.85rem; color: #666; margin-top: 0.5rem; }
+    .device-meta div { margin-bottom: 0.25rem; }
+    .form-row { margin-bottom: 0.75rem; }
+    .form-row label { display: block; font-size: 0.8rem; color: #666; margin-bottom: 0.25rem; }
+    .form-row input { width: 100%; padding: 0.55rem 0.65rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+    h2 { margin: 0 0 0.75rem; font-size: 1.05rem; }
+    h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+    .hint { font-size: 0.8rem; color: #666; margin: 0 0 0.75rem; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Installer Portal</h1>
+    <p>Provision RoomOS into empty workspaces</p>
+  </header>
+  <main>
+    <div id="error" class="error" style="display:none"></div>
+    <div id="view"></div>
+  </main>
+  <script>
+    const state = { location: null, workspace: null };
+    let orgDirectory = null;
+
+    async function api(path, options = {}) {
+      const res = await fetch(path, options);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.hint || err.detail || err.error || res.statusText);
+      }
+      if (res.status === 204) return null;
+      return res.json();
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.style.display = 'block';
+      el.textContent = msg;
+    }
+
+    function clearError() {
+      document.getElementById('error').style.display = 'none';
+    }
+
+    function deviceBadge(count) {
+      if (!count) return '<span class="badge badge-empty">Empty · ready</span>';
+      return `<span class="badge badge-occupied">${count} device${count === 1 ? '' : 's'}</span>`;
+    }
+
+    function orgDirectoryCard(stats) {
+      if (!stats) {
+        return `<div class="card">
+          <h3>Org Directory (read-only)</h3>
+          <div class="stats"><div class="stat"><div class="label">Unavailable</div></div></div>
+        </div>`;
+      }
+      return `<div class="card">
+        <h3>Org Directory (read-only)</h3>
+        <div class="stats">
+          <div class="stat"><div class="num">${stats.peopleCount}</div><div class="label">People (sample)</div></div>
+          <div class="stat"><div class="num">${stats.groupsCount}</div><div class="label">Groups</div></div>
+        </div>
+      </div>`;
+    }
+
+    async function loadOrgDirectory() {
+      if (orgDirectory) return orgDirectory;
+      try {
+        orgDirectory = await api('/api/org-directory');
+      } catch (e) {
+        orgDirectory = null;
+      }
+      return orgDirectory;
+    }
+
+    async function renderLocations() {
+      clearError();
+      state.location = null;
+      state.workspace = null;
+      const [locations, directory] = await Promise.all([
+        api('/api/locations'),
+        loadOrgDirectory(),
+      ]);
+      document.getElementById('view').innerHTML = `
+        <div class="card">
+          <div class="breadcrumb">Home</div>
+          <h2>Select Location</h2>
+          <ul>${locations.map(l => `
+            <li class="item" onclick="selectLocation('${escapeAttr(l.id)}', '${escapeAttr(l.name)}')">
+              <span class="item-main">${escapeHtml(l.name)}</span>
+              <span class="chevron">›</span>
+            </li>`).join('') || '<li class="item"><span>No locations found</span></li>'}
+          </ul>
+        </div>
+        ${orgDirectoryCard(directory)}`;
+    }
+
+    async function selectLocation(id, name, openCreate = false) {
+      clearError();
+      state.location = { id, name };
+      state.workspace = null;
+      const workspaces = await api('/api/workspaces?locationId=' + encodeURIComponent(id));
+
+      document.getElementById('view').innerHTML = `
+        <div class="card">
+          <div class="breadcrumb"><a onclick="renderLocations()">Home</a> › ${escapeHtml(name)}</div>
+          <h2>Workspaces</h2>
+          <p class="hint">Activation codes apply to <strong>empty</strong> workspaces only — typical for first RoomOS install. Workspaces that already have devices are view-only.</p>
+          <ul>${workspaces.map(w => `
+            <li class="item" onclick="openWorkspace('${escapeAttr(w.id)}', '${escapeAttr(w.displayName || w.name)}', ${w.deviceCount || 0})">
+              <div class="item-main">
+                <div>${escapeHtml(w.displayName || w.name)}</div>
+                <div class="item-sub">${w.deviceCount ? 'View devices' : 'Generate activation code'}</div>
+              </div>
+              ${deviceBadge(w.deviceCount || 0)}
+              <span class="chevron">›</span>
+            </li>`).join('') || '<li class="item"><span>No workspaces in this location yet</span></li>'}
+          </ul>
+        </div>
+        <div class="card" id="create-workspace-card">
+          <h3>${openCreate ? 'Create Workspace' : 'Add Workspace'}</h3>
+          ${openCreate ? renderCreateForm() : '<button class="secondary" onclick="selectLocation(\'' + escapeAttr(id) + '\', \'' + escapeAttr(name) + '\', true)">+ Create new workspace</button>'}
+        </div>`;
+    }
+
+    function renderCreateForm() {
+      return `
+        <p class="hint">Creates a workspace in this location. New workspaces start empty and can receive an activation code immediately.</p>
+        <div class="form-row">
+          <label for="ws-name">Workspace name</label>
+          <input id="ws-name" type="text" placeholder="e.g. Huddle Room 3B" autocomplete="off">
+        </div>
+        <div class="form-row">
+          <label for="ws-capacity">Capacity (optional)</label>
+          <input id="ws-capacity" type="number" min="1" max="100" placeholder="6">
+        </div>
+        <button onclick="createWorkspace()">Create workspace</button>
+        <button class="secondary" onclick="selectLocation('${escapeAttr(state.location.id)}', '${escapeAttr(state.location.name)}')">Cancel</button>`;
+    }
+
+    async function createWorkspace() {
+      clearError();
+      const displayName = document.getElementById('ws-name')?.value?.trim();
+      const capacity = document.getElementById('ws-capacity')?.value;
+      if (!displayName) {
+        showError('Workspace name is required');
+        return;
+      }
+
+      try {
+        const workspace = await api('/api/workspaces', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            displayName,
+            locationId: state.location.id,
+            capacity: capacity || undefined,
+          }),
+        });
+        await openWorkspace(workspace.id, workspace.displayName || displayName, 0);
+      } catch (e) {
+        showError(e.message);
+      }
+    }
+
+    async function openWorkspace(id, name, deviceCount) {
+      clearError();
+      state.workspace = { id, name, deviceCount: Number(deviceCount) || 0 };
+
+      if (state.workspace.deviceCount > 0) {
+        await renderOccupiedWorkspace();
+      } else {
+        await renderEmptyWorkspace();
+      }
+    }
+
+    async function renderEmptyWorkspace() {
+      document.getElementById('view').innerHTML = `
+        <div class="card">
+          <div class="breadcrumb">
+            <a onclick="renderLocations()">Home</a> ›
+            <a onclick="selectLocation('${escapeAttr(state.location.id)}', '${escapeAttr(state.location.name)}')">${escapeHtml(state.location.name)}</a>
+          </div>
+          <h2>${escapeHtml(state.workspace.name)}</h2>
+          <p class="hint">Empty workspace — generate an activation code and enter it on the RoomOS device to register it here.</p>
+          <div id="code-section">
+            <button onclick="generateActivationCode()">Generate activation code</button>
+          </div>
+          <button class="danger" onclick="deleteWorkspace()">Delete workspace</button>
+          ${backToLocationButton()}
+        </div>`;
+    }
+
+    async function deleteWorkspace() {
+      if (!state.workspace || !state.location) return;
+      if (!confirm(`Delete workspace "${state.workspace.name}"?\n\nOnly empty demo workspaces can be removed.`)) return;
+
+      clearError();
+      try {
+        await api('/api/workspaces/' + encodeURIComponent(state.workspace.id) + '?locationId=' + encodeURIComponent(state.location.id), {
+          method: 'DELETE',
+        });
+        await selectLocation(state.location.id, state.location.name);
+      } catch (e) {
+        showError(e.message);
+      }
+    }
+
+    async function generateActivationCode() {
+      clearError();
+      const section = document.getElementById('code-section');
+      section.innerHTML = '<p class="hint">Generating code…</p>';
+
+      try {
+        const activation = await api('/api/workspaces/' + encodeURIComponent(state.workspace.id) + '/activation-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+
+        const expiry = activation.expiryTime
+          ? new Date(activation.expiryTime).toLocaleString()
+          : null;
+
+        section.innerHTML = `
+          <h3>Device activation code</h3>
+          <div class="code-box">${escapeHtml(formatActivationCodeDisplay(activation.code))}</div>
+          ${expiry ? `<p class="hint" style="text-align:center">Expires ${escapeHtml(expiry)}</p>` : ''}
+          <button onclick="copyCode('${escapeAttr(activation.code)}')">Copy activation code</button>
+          <button class="secondary" onclick="generateActivationCode()">Generate new code</button>`;
+      } catch (e) {
+        section.innerHTML = `
+          <div class="error">${escapeHtml(e.message)}</div>
+          <button onclick="generateActivationCode()">Try again</button>`;
+      }
+    }
+
+    async function renderOccupiedWorkspace() {
+      const devices = await api('/api/devices?workspaceId=' + encodeURIComponent(state.workspace.id));
+
+      document.getElementById('view').innerHTML = `
+        <div class="card">
+          <div class="breadcrumb">
+            <a onclick="renderLocations()">Home</a> ›
+            <a onclick="selectLocation('${escapeAttr(state.location.id)}', '${escapeAttr(state.location.name)}')">${escapeHtml(state.location.name)}</a>
+          </div>
+          <h2>${escapeHtml(state.workspace.name)}</h2>
+          <div class="info">
+            This workspace already has ${devices.length} device${devices.length === 1 ? '' : 's'}.
+            Activation codes are for provisioning the <strong>first</strong> RoomOS device into an empty workspace
+            (common-area workspaces allow one device; room workspaces typically hold one collaboration device).
+            Create a new empty workspace to provision another device.
+          </div>
+          <h3 style="margin-top:1rem">Devices</h3>
+          <ul>${devices.map(d => `
+            <li class="item" onclick="viewDevice('${escapeAttr(d.id)}', '${escapeAttr(d.displayName || d.product)}')">
+              <div class="item-main">
+                <div>${escapeHtml(d.displayName || d.product || 'Device')}</div>
+                <div class="item-sub">${escapeHtml(d.product || '')} · ${escapeHtml(d.connectionStatus || 'unknown')}</div>
+              </div>
+              <span class="chevron">›</span>
+            </li>`).join('') || '<li class="item"><span>No devices found</span></li>'}
+          </ul>
+          ${backToLocationButton()}
+        </div>`;
+
+    }
+
+    function viewDevice(id, name) {
+      clearError();
+      api('/api/devices?workspaceId=' + encodeURIComponent(state.workspace.id)).then(devices => {
+        const device = devices.find(d => d.id === id) || {};
+        document.getElementById('view').innerHTML = `
+          <div class="card">
+            <div class="breadcrumb">
+              <a onclick="renderLocations()">Home</a> ›
+              <a onclick="selectLocation('${escapeAttr(state.location.id)}', '${escapeAttr(state.location.name)}')">${escapeHtml(state.location.name)}</a> ›
+              <a onclick="openWorkspace('${escapeAttr(state.workspace.id)}', '${escapeAttr(state.workspace.name)}', ${state.workspace.deviceCount})">${escapeHtml(state.workspace.name)}</a>
+            </div>
+            <h2>${escapeHtml(name)}</h2>
+            <div class="device-meta">
+              <div>Status: <strong>${escapeHtml(device.connectionStatus || 'unknown')}</strong></div>
+              <div>Product: ${escapeHtml(device.product || 'N/A')}</div>
+              <div>Serial: ${escapeHtml(device.serial || 'N/A')}</div>
+              <div>MAC: ${escapeHtml(device.mac || 'N/A')}</div>
+            </div>
+            <button class="secondary" style="margin-top:1rem" onclick="openWorkspace('${escapeAttr(state.workspace.id)}', '${escapeAttr(state.workspace.name)}', ${state.workspace.deviceCount})">Back to workspace</button>
+          </div>`;
+      }).catch(e => showError(e.message));
+    }
+
+    function backToLocationButton() {
+      if (!state.location) return '';
+      return `<button class="secondary" style="margin-top:1rem" onclick="selectLocation('${escapeAttr(state.location.id)}', '${escapeAttr(state.location.name)}')">Back to location</button>`;
+    }
+
+    function formatActivationCodeDisplay(code) {
+      const raw = String(code || '').replace(/\s/g, '');
+      return raw.replace(/(.{4})/g, '$1 ').trim();
+    }
+
+    function copyCode(code) {
+      const raw = String(code || '').replace(/\s/g, '');
+      navigator.clipboard.writeText(raw).then(() => alert('Activation code copied'));
+    }
+
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function escapeAttr(str) {
+      return String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    renderLocations().catch(e => showError(e.message));
+  </script>
+</body>
+</html>

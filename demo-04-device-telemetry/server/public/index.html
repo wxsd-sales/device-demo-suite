@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Device Telemetry Console (Demo)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; background: #0f1419; color: #e7ecf3; }
+    header { background: linear-gradient(135deg, #1a2332 0%, #243447 100%); padding: 1.25rem 2rem; border-bottom: 1px solid #2d3a4d; }
+    header h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+    header p { margin: 0.35rem 0 0; font-size: 0.85rem; color: #9fb0c5; }
+    main { max-width: 1280px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1.25rem; }
+    button { cursor: pointer; border: none; border-radius: 4px; padding: 0.5rem 1rem; font-size: 0.85rem; }
+    button.primary { background: #0078d4; color: white; }
+    button.secondary { background: #3d4f63; color: #e7ecf3; }
+    button.secondary:hover { background: #4a6078; }
+    .live-pill { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: #6fcf97; font-weight: 500; }
+    .live-pill::before { content: ''; width: 8px; height: 8px; background: #6fcf97; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+    .waiting { padding: 1rem; background: #1e2a3a; border: 1px solid #334155; border-radius: 8px; margin-bottom: 1rem; font-size: 0.9rem; color: #b8c5d6; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .card { background: #1a2332; border: 1px solid #2d3a4d; border-radius: 8px; padding: 1rem; }
+    .card .value { font-size: 1.6rem; font-weight: 700; color: #60a5fa; line-height: 1.1; }
+    .card .label { font-size: 0.72rem; color: #94a3b8; margin-top: 0.35rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    h2 { font-size: 0.95rem; margin: 0 0 0.75rem; color: #cbd5e1; font-weight: 600; }
+    .device-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .device-card { background: #1a2332; border: 1px solid #2d3a4d; border-radius: 8px; overflow: hidden; }
+    .device-head { padding: 1rem; border-bottom: 1px solid #2d3a4d; display: flex; justify-content: space-between; gap: 0.75rem; align-items: flex-start; }
+    .device-head h3 { margin: 0; font-size: 1rem; color: #f1f5f9; }
+    .device-head .sub { font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem; }
+    .pill { font-size: 0.65rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+    .pill-call { background: #14532d; color: #86efac; }
+    .pill-idle { background: #1e293b; color: #94a3b8; }
+    .pill-mode { background: #1e3a5f; color: #93c5fd; }
+    .device-body { padding: 0.75rem 1rem 1rem; }
+    .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; font-size: 0.8rem; }
+    .metric-grid dt { color: #64748b; margin: 0; }
+    .metric-grid dd { margin: 0; color: #e2e8f0; word-break: break-word; }
+    .section-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin: 0.75rem 0 0.35rem; }
+    .events { background: #1a2332; border: 1px solid #2d3a4d; border-radius: 8px; padding: 1rem; }
+    .events h3 { margin: 0 0 0.75rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; }
+    .event-row { border-bottom: 1px solid #243044; padding: 0.65rem 0; font-size: 0.8rem; }
+    .event-row:last-child { border-bottom: none; }
+    .event-meta { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: baseline; margin-bottom: 0.35rem; }
+    .event-meta time { color: #64748b; font-size: 0.75rem; }
+    .badge { font-size: 0.62rem; font-weight: 600; padding: 0.15rem 0.4rem; border-radius: 3px; text-transform: uppercase; }
+    .badge-status { background: #1e3a5f; color: #93c5fd; }
+    .badge-event { background: #422006; color: #fdba74; }
+    .event-summary { color: #94a3b8; font-size: 0.78rem; }
+    .event-toggle { margin-left: auto; background: #243044; border: 1px solid #334155; color: #cbd5e1; padding: 0.15rem 0.45rem; font-size: 0.68rem; border-radius: 3px; cursor: pointer; }
+    .event-payload { display: none; margin-top: 0.5rem; }
+    .event-payload.open { display: block; }
+    .event-payload pre { margin: 0; font-size: 0.68rem; line-height: 1.4; white-space: pre-wrap; word-break: break-word; max-height: 200px; overflow: auto; background: #0f1419; padding: 0.6rem; border-radius: 4px; color: #cbd5e1; }
+    .empty { color: #64748b; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Device Telemetry Console</h1>
+    <p>RoomOS macro agent → HTTP ingest — richer xAPI data than Control Hub webhooks alone</p>
+  </header>
+  <main>
+    <div class="toolbar">
+      <span class="live-pill">Auto-refresh 3s</span>
+      <button class="secondary" onclick="exportTelemetry('json')">Export JSON</button>
+      <button class="secondary" onclick="exportTelemetry('csv')">Export CSV</button>
+      <button class="secondary" onclick="resetData()">Reset</button>
+    </div>
+
+    <div id="waiting" class="waiting" style="display:none">
+      Waiting for device telemetry. Upload <code>macro/device-telemetry-agent.js</code> to a Desk Pro or Room Kit,
+      set <code>serviceUrl</code> to your ngrok/LAN URL + <code>/api/telemetry</code>, and enable the macro.
+    </div>
+
+    <div class="cards" id="cards"></div>
+
+    <h2>Devices</h2>
+    <div class="device-grid" id="devices"></div>
+
+    <div class="events">
+      <h3>Telemetry stream</h3>
+      <div id="events"></div>
+    </div>
+  </main>
+  <script>
+    let lastData = null;
+    const openPayloads = new Set();
+
+    async function loadDashboard() {
+      const res = await fetch('/api/dashboard');
+      lastData = await res.json();
+      render(lastData);
+    }
+
+    function render(data) {
+      document.getElementById('waiting').style.display = data.devices?.length ? 'none' : 'block';
+
+      const s = data.summary || {};
+      document.getElementById('cards').innerHTML = `
+        <div class="card"><div class="value">${s.deviceCount || 0}</div><div class="label">Devices</div></div>
+        <div class="card"><div class="value">${s.inCallDevices || 0}</div><div class="label">In call now</div></div>
+        <div class="card"><div class="value">${s.eventCount || 0}</div><div class="label">Recent posts</div></div>
+        <div class="card"><div class="value">${s.lastEvent ? fmtTime(s.lastEvent) : '—'}</div><div class="label">Last received</div></div>`;
+
+      document.getElementById('devices').innerHTML = (data.devices || []).map(renderDevice).join('')
+        || '<p class="empty">No devices reporting yet</p>';
+
+      document.getElementById('events').innerHTML = (data.recentEvents || []).map(renderEvent).join('')
+        || '<p class="empty">No telemetry posts yet</p>';
+    }
+
+    function renderDevice(d) {
+      const info = d.systemInfo || {};
+      const title = info.systemProductId || d.deviceKey;
+      const serial = info.systemSerialNumber || '—';
+      const sw = info.softwareVersion || '—';
+      const mode = info.systemMode || 'RoomOS';
+
+      return `
+        <article class="device-card">
+          <div class="device-head">
+            <div>
+              <h3>${escapeHtml(title)}</h3>
+              <div class="sub">Serial ${escapeHtml(serial)} · ${escapeHtml(sw)}</div>
+              <div class="sub">Last seen ${fmtDate(d.lastSeen)}</div>
+            </div>
+            <div>
+              <span class="pill ${d.inCall ? 'pill-call' : 'pill-idle'}">${d.inCall ? 'In call' : 'Idle'}</span>
+              <span class="pill pill-mode">${escapeHtml(mode)}</span>
+            </div>
+          </div>
+          <div class="device-body">
+            ${d.inCall && d.activeCall ? `
+              <div class="section-label">Active call</div>
+              <dl class="metric-grid">
+                <dt>Display</dt><dd>${escapeHtml(d.activeCall.displayName || '—')}</dd>
+                <dt>Protocol</dt><dd>${escapeHtml(d.activeCall.protocol || '—')}</dd>
+                <dt>Callback</dt><dd>${escapeHtml(d.activeCall.callbackNumber || '—')}</dd>
+              </dl>` : ''}
+            ${d.network ? `
+              <div class="section-label">Network</div>
+              <dl class="metric-grid">
+                <dt>Ethernet</dt><dd>${fmtBool(d.network.ethernetConnected)}</dd>
+                <dt>Wi‑Fi</dt><dd>${fmtBool(d.network.wifiConnected)}</dd>
+                <dt>DNS</dt><dd>${escapeHtml(d.network.dnsStatus || '—')}</dd>
+              </dl>` : ''}
+            ${d.roomAnalytics ? `
+              <div class="section-label">Room analytics (on-device)</div>
+              <dl class="metric-grid">
+                <dt>People</dt><dd>${fmt(d.roomAnalytics.peopleCount)} ${d.roomAnalytics.peoplePresence ? '(' + escapeHtml(d.roomAnalytics.peoplePresence) + ')' : ''}</dd>
+                <dt>Temp</dt><dd>${d.roomAnalytics.ambientTemperature != null ? d.roomAnalytics.ambientTemperature + '°' : '—'}</dd>
+                <dt>Humidity</dt><dd>${d.roomAnalytics.relativeHumidity != null ? d.roomAnalytics.relativeHumidity + '%' : '—'}</dd>
+              </dl>` : ''}
+            ${d.mediaChannels?.channelCount ? `
+              <div class="section-label">Media channels</div>
+              <dl class="metric-grid"><dt>Channels</dt><dd>${d.mediaChannels.channelCount}</dd></dl>` : ''}
+            ${d.standby ? `
+              <div class="section-label">Standby</div>
+              <dl class="metric-grid"><dt>State</dt><dd>${escapeHtml(d.standby.standbyState || '—')}</dd></dl>` : ''}
+            ${d.lastEvent ? `
+              <div class="section-label">Last event</div>
+              <dl class="metric-grid">
+                <dt>Type</dt><dd>${escapeHtml(d.lastEvent.name || '—')}</dd>
+                <dt>At</dt><dd>${fmtDate(d.lastEvent.at)}</dd>
+              </dl>` : ''}
+          </div>
+        </article>`;
+    }
+
+    function renderEvent(e) {
+      const eid = e.id || `${e.receivedAt}|${e.command}|${e.deviceKey}`;
+      const open = openPayloads.has(eid);
+      const badge = e.kind === 'event' ? 'badge-event' : 'badge-status';
+      const label = e.kind === 'event' ? (e.eventName || 'event') : (e.command || 'status');
+      const summary = eventSummary(e);
+
+      return `
+        <div class="event-row">
+          <div class="event-meta">
+            <time>${fmtDate(e.receivedAt)}</time>
+            <span class="badge ${badge}">${escapeHtml(label)}</span>
+            <span>${escapeHtml(e.deviceKey || 'unknown')}</span>
+            <span class="event-summary">${escapeHtml(summary)}</span>
+            <button type="button" class="event-toggle" onclick="togglePayload('${escapeAttr(eid)}')">${open ? 'Hide' : 'Payload'}</button>
+          </div>
+          <div class="event-payload${open ? ' open' : ''}">
+            <pre>${escapeHtml(JSON.stringify(e.deviceData, null, 2))}</pre>
+          </div>
+        </div>`;
+    }
+
+    function eventSummary(e) {
+      if (e.summary) {
+        if (e.summary.inCall) return `Call: ${e.summary.displayName || e.summary.callbackNumber || 'active'}`;
+        if (e.summary.peopleCount != null) return `People: ${e.summary.peopleCount}`;
+        if (e.summary.channelCount != null) return `Channels: ${e.summary.channelCount}`;
+        if (e.summary.standbyState) return `Standby: ${e.summary.standbyState}`;
+      }
+      return e.kind === 'event' ? 'Device event' : 'Status snapshot';
+    }
+
+    function togglePayload(id) {
+      if (openPayloads.has(id)) openPayloads.delete(id);
+      else openPayloads.add(id);
+      if (lastData) render(lastData);
+    }
+
+    function exportTelemetry(format) {
+      const path = format === 'csv' ? '/api/export/telemetry.csv' : '/api/export/telemetry.json';
+      window.open(path, '_blank');
+    }
+
+    async function resetData() {
+      if (!confirm('Clear all device telemetry data?')) return;
+      openPayloads.clear();
+      await fetch('/api/reset', { method: 'DELETE' });
+      await loadDashboard();
+    }
+
+    function fmt(v) { return v != null && v !== '' ? v : '—'; }
+    function fmtBool(v) { return v === true ? 'Connected' : v === false ? 'Down' : '—'; }
+    function fmtDate(v) { return v ? new Date(v).toLocaleString() : '—'; }
+    function fmtTime(v) { return v ? new Date(v).toLocaleTimeString() : '—'; }
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function escapeAttr(str) { return escapeHtml(str).replace(/'/g, '&#39;'); }
+
+    loadDashboard();
+    setInterval(loadDashboard, 3000);
+  </script>
+</body>
+</html>

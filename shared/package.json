@@ -1,0 +1,10 @@
+{
+  "name": "@energy-solutions-demos/shared",
+  "private": true,
+  "version": "1.0.0",
+  "main": "webex.js",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "mongodb": "^6.12.0"
+  }
+}

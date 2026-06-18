@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teams Room KPI Dashboard (Demo)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; background: #f0f2f5; color: #242424; }
+    header { background: #f2c811; color: #333; padding: 1rem 2rem; }
+    header h1 { margin: 0; font-size: 1.25rem; }
+    header p { margin: 0.25rem 0 0; font-size: 0.85rem; opacity: 0.8; }
+    main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem 3rem; }
+    .toolbar { margin-bottom: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+    button { cursor: pointer; border: none; border-radius: 4px; padding: 0.5rem 1rem; color: white; font-size: 0.85rem; }
+    button.primary { background: #0078d4; }
+    button.secondary { background: #666; }
+    .live-pill { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: #107c10; font-weight: 500; }
+    .live-pill::before { content: ''; width: 8px; height: 8px; background: #107c10; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .waiting { padding: 1rem; background: #fff4ce; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; }
+    .meta { font-size: 0.8rem; color: #666; margin-bottom: 1rem; }
+    .legend { display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.8rem; color: #555; background: white; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+    .legend-item { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .badge { font-size: 0.65rem; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 3px; letter-spacing: 0.02em; }
+    .badge-api { background: #deecf9; color: #0078d4; }
+    .badge-wh { background: #dff6dd; color: #107c10; }
+    .badge-type { background: #eee; color: #555; text-transform: uppercase; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .card { background: white; padding: 1.25rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .card .value { font-size: 1.75rem; font-weight: bold; color: #0078d4; line-height: 1.1; }
+    .card .label { font-size: 0.75rem; color: #666; margin-top: 0.35rem; }
+    .card .hint { font-size: 0.68rem; color: #888; margin-top: 0.2rem; }
+    h2 { font-size: 1rem; margin: 0 0 0.75rem; color: #444; }
+    .table-wrap { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1.5rem; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #eee; font-size: 0.85rem; vertical-align: top; }
+    th { background: #fafafa; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; color: #666; }
+    tr.ws-row { cursor: pointer; transition: background 0.15s; }
+    tr.ws-row:hover { background: #f8f9fa; }
+    tr.ws-row.expanded { background: #f3f9ff; }
+    tr.detail-row td { padding: 0; background: #fafbfc; border-bottom: 1px solid #e0e0e0; }
+    .detail-panel { padding: 1rem 1.25rem 1.25rem; }
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    .detail-block { background: white; border: 1px solid #eee; border-radius: 6px; padding: 0.85rem; }
+    .detail-block h4 { margin: 0 0 0.5rem; font-size: 0.72rem; text-transform: uppercase; color: #888; letter-spacing: 0.04em; }
+    .detail-block dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.75rem; font-size: 0.82rem; }
+    .detail-block dt { color: #888; }
+    .detail-block dd { margin: 0; word-break: break-word; }
+    .device-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; }
+    .device-table th, .device-table td { padding: 0.45rem 0.5rem; border-bottom: 1px solid #eee; }
+    .device-table th { background: #f5f5f5; font-size: 0.68rem; }
+    .health-healthy, .conn-connected { color: #107c10; font-weight: 600; }
+    .health-degraded, .health-stale, .conn-disconnected { color: #d83b01; font-weight: 600; }
+    .health-offline { color: #a4262c; font-weight: 600; }
+    .health-unknown, .conn-unknown { color: #888; }
+    .wh-live { color: #107c10; font-weight: 500; }
+    .wh-stale { color: #d83b01; }
+    .wh-none { color: #aaa; }
+    .expand-icon { display: inline-block; width: 1rem; color: #888; font-size: 0.7rem; }
+    .name-cell { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+    .subtext { display: block; font-size: 0.72rem; color: #888; margin-top: 0.15rem; }
+    .chart, .events { background: white; padding: 1rem 1.25rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
+    .chart h3, .events h3 { margin: 0 0 0.75rem; font-size: 0.85rem; color: #666; text-transform: uppercase; letter-spacing: 0.03em; }
+    .bar-row { display: flex; align-items: center; margin: 0.5rem 0; }
+    .bar-label { width: 180px; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .bar-track { flex: 1; background: #eee; height: 20px; border-radius: 4px; margin: 0 0.5rem; }
+    .bar-fill { height: 100%; background: #0078d4; border-radius: 4px; }
+    .bar-value { width: 50px; font-size: 0.85rem; text-align: right; }
+    .event-card { border: 1px solid #eee; border-radius: 6px; margin-bottom: 0.5rem; overflow: hidden; }
+    .event-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 1rem; padding: 0.65rem 0.85rem; background: #fafafa; font-size: 0.82rem; }
+    .event-head time { color: #888; font-size: 0.78rem; white-space: nowrap; }
+    .event-head .event-target { font-weight: 600; }
+    .event-head .event-summary { color: #555; flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .event-toggle { margin-left: auto; background: none; border: 1px solid #ccc; color: #555; padding: 0.2rem 0.5rem; font-size: 0.72rem; border-radius: 3px; }
+    .event-body { display: none; padding: 0.75rem 0.85rem; background: white; border-top: 1px solid #eee; }
+    .event-body.open { display: block; }
+    .event-body pre { margin: 0; font-size: 0.72rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto; background: #f5f5f5; padding: 0.65rem; border-radius: 4px; }
+    .status.loading { color: #0078d4; font-size: 0.85rem; }
+    .empty { color: #888; font-size: 0.85rem; padding: 0.5rem 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Teams Room KPI Dashboard</h1>
+    <p>Live webhooks + Control Hub REST API — dashboard and raw webhook export for observability</p>
+  </header>
+  <main>
+    <div class="toolbar">
+      <span class="live-pill">Auto-refresh 3s</span>
+      <button class="primary" onclick="syncApi()">Sync from Control Hub</button>
+      <button class="secondary" onclick="resetData()">Reset Data</button>
+      <button class="secondary" onclick="exportWebhooks('json')">Export Webhooks (JSON)</button>
+      <button class="secondary" onclick="exportWebhooks('csv')">Export Webhooks (CSV)</button>
+      <span id="sync-status" class="status"></span>
+    </div>
+    <div id="waiting" class="waiting" style="display:none">
+      No data yet. Click <strong>Sync from Control Hub</strong> to pull workspaces, devices, and 7-day metrics,
+      and/or configure a Connect Webhook to POST to <code>/api/webhooks/workspace</code>.
+    </div>
+    <div class="meta" id="meta"></div>
+    <div class="legend">
+      <span class="legend-item"><span class="badge badge-api">API</span> Enriched from Control Hub REST sync</span>
+      <span class="legend-item"><span class="badge badge-wh">WH</span> Live metrics from Connect Webhook</span>
+      <span class="legend-item">Click a workspace row to expand devices and detail</span>
+    </div>
+    <div class="cards" id="cards"></div>
+    <h2>Workspaces</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Workspace</th>
+            <th>Health</th>
+            <th>Devices</th>
+            <th>Webhook</th>
+            <th>People</th>
+            <th>Utilization (7d)</th>
+            <th>Birthdate</th>
+          </tr>
+        </thead>
+        <tbody id="workspace-body"><tr><td colspan="8">Loading...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="chart" id="chart"></div>
+    <div class="events" id="events-panel">
+      <h3>Recent Webhook Events</h3>
+      <div id="events"></div>
+    </div>
+  </main>
+  <script>
+    let expandedIndex = null;
+    let lastData = null;
+    const openEventIds = new Set();
+
+    async function loadKpis() {
+      const res = await fetch('/api/kpis');
+      lastData = await res.json();
+      render(lastData);
+    }
+
+    async function syncApi() {
+      const el = document.getElementById('sync-status');
+      el.textContent = 'Syncing from Control Hub API...';
+      el.classList.add('loading');
+      try {
+        const res = await fetch('/api/sync', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || data.error);
+        el.textContent = `Synced ${data.summary.syncedWorkspaces} workspaces at ${new Date(data.syncedAt).toLocaleTimeString()}`;
+        await loadKpis();
+      } catch (e) {
+        el.textContent = 'Sync failed: ' + e.message;
+      }
+      el.classList.remove('loading');
+    }
+
+    function sourceBadges(w) {
+      const parts = [];
+      if (w.dataSources?.api) parts.push('<span class="badge badge-api" title="Control Hub REST sync">API</span>');
+      if (w.dataSources?.webhook) parts.push('<span class="badge badge-wh" title="Connect Webhook live metrics">WH</span>');
+      return parts.join('');
+    }
+
+    function fmt(v, suffix = '') {
+      return v != null && v !== '' ? `${v}${suffix}` : '—';
+    }
+
+    function fmtDate(v) {
+      return v ? new Date(v).toLocaleString() : '—';
+    }
+
+    function fmtDuration(seconds) {
+      if (seconds == null) return '—';
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      return h ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    function webhookStatus(w) {
+      if (w.webhookHealth === 'healthy') return '<span class="wh-live" title="Webhook received recently">Live</span>';
+      if (w.webhookHealth === 'stale') return '<span class="wh-stale" title="No recent webhook">Stale</span>';
+      return '<span class="wh-none">—</span>';
+    }
+
+    function renderDetail(w) {
+      const liveRows = [
+        ['People count', fmt(w.peopleCount)],
+        ['Presence', fmt(w.peoplePresence)],
+        ['Temperature', w.ambientTemperature != null ? `${w.ambientTemperature}°` : '—'],
+        ['Humidity', w.relativeHumidity != null ? `${w.relativeHumidity}%` : '—'],
+        ['Standby', fmt(w.standbyState)],
+        ['Active calls', fmt(w.activeCalls)],
+        ['Booking', fmt(w.bookingStatus)],
+        ['Last webhook', fmtDate(w.webhookLastSeen)],
+        ['Last event type', fmt(w.lastEventType)],
+      ];
+
+      const apiRows = [
+        ['Location', fmt(w.locationName)],
+        ['API health', fmt(w.deviceHealth)],
+        ['Time used (7d)', fmtDuration(w.timeUsedSeconds)],
+        ['Time booked (7d)', fmtDuration(w.timeBookedSeconds)],
+        ['Utilization', w.utilizationPct != null ? `${w.utilizationPct}%` : '—'],
+        ['Room created', fmtDate(w.birthdate)],
+        ['Boot event', fmtDate(w.bootEventAt)],
+        ['Workspace ID', w.workspaceId || '—'],
+      ];
+
+      const devices = w.devices || [];
+      const deviceTable = devices.length ? `
+        <table class="device-table">
+          <thead><tr>
+            <th>Device</th><th>Product</th><th>Connection</th><th>Serial</th><th>Software</th><th>Created</th>
+          </tr></thead>
+          <tbody>${devices.map(d => `
+            <tr>
+              <td>${escapeHtml(d.displayName || '—')}</td>
+              <td>${escapeHtml(d.product || '—')}</td>
+              <td class="conn-${d.connectionStatus || 'unknown'}">${escapeHtml(d.connectionStatus || '—')}</td>
+              <td>${escapeHtml(d.serial || '—')}</td>
+              <td>${escapeHtml(d.software || '—')}</td>
+              <td>${d.birthdate ? new Date(d.birthdate).toLocaleDateString() : '—'}</td>
+            </tr>`).join('')}</tbody>
+        </table>` : `<p class="empty">${w.dataSources?.webhook ? 'Webhook device: ' + escapeHtml(w.deviceId || 'unknown') + ' — run API sync for full device catalog.' : 'No devices — run Sync from Control Hub.'}</p>`;
+
+      return `
+        <div class="detail-panel">
+          <div class="detail-grid">
+            <div class="detail-block">
+              <h4>Live webhook metrics</h4>
+              <dl>${liveRows.map(([k,v]) => `<dt>${k}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>
+            </div>
+            <div class="detail-block">
+              <h4>Control Hub (API sync)</h4>
+              <dl>${apiRows.map(([k,v]) => `<dt>${k}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>
+            </div>
+          </div>
+          <div class="detail-block">
+            <h4>Devices (${devices.length || (w.deviceId ? 1 : 0)})</h4>
+            ${deviceTable}
+          </div>
+        </div>`;
+    }
+
+    function toggleRow(index) {
+      expandedIndex = expandedIndex === index ? null : index;
+      if (lastData) render(lastData);
+    }
+
+    function render(data) {
+      document.getElementById('waiting').style.display = data.workspaces?.length ? 'none' : 'block';
+
+      const s = data.summary || {};
+      const staleMin = s.webhookStaleMinutes || 15;
+
+      document.getElementById('meta').innerHTML = `
+        Last API sync: ${data.lastApiSync ? new Date(data.lastApiSync).toLocaleString() : 'never'}
+        &nbsp;|&nbsp; Last webhook: ${data.lastWebhookEvent ? new Date(data.lastWebhookEvent).toLocaleString() : 'none'}`;
+
+      document.getElementById('cards').innerHTML = `
+        <div class="card"><div class="value">${s.totalWorkspaces || 0}</div><div class="label">Workspaces</div></div>
+        <div class="card"><div class="value">${s.onlineDevices ?? '—'}/${s.totalDevices ?? '—'}</div><div class="label">Devices Online (API)</div><div class="hint">From Control Hub sync</div></div>
+        <div class="card"><div class="value">${s.webhookLiveDevices ?? 0}</div><div class="label">Devices Reporting Live</div><div class="hint">Unique devices with webhook in last ${staleMin} min</div></div>
+        <div class="card"><div class="value">${s.avgUtilizationPct ?? '—'}${s.avgUtilizationPct != null ? '%' : ''}</div><div class="label">Avg Utilization (7d)</div></div>
+        <div class="card"><div class="value">${s.occupiedRooms || 0}</div><div class="label">Occupied Now</div><div class="hint">From live webhook metrics</div></div>
+        <div class="card"><div class="value">${s.webhookLiveRooms || 0}</div><div class="label">Rooms with Live Webhook</div><div class="hint">${s.webhookStaleRooms || 0} stale</div></div>`;
+
+      const rows = [];
+      (data.workspaces || []).forEach((w, idx) => {
+        const isOpen = expandedIndex === idx;
+        rows.push(`
+          <tr class="ws-row${isOpen ? ' expanded' : ''}" onclick="toggleRow(${idx})">
+            <td><span class="expand-icon">${isOpen ? '▼' : '▶'}</span></td>
+            <td>
+              <div class="name-cell">
+                <span>${escapeHtml(w.name)}</span>${sourceBadges(w)}
+              </div>
+              ${w.locationName ? `<span class="subtext">${escapeHtml(w.locationName)}</span>` : ''}
+            </td>
+            <td class="health-${w.health}">${w.health}</td>
+            <td>${w.onlineDevices != null ? w.onlineDevices + '/' + w.deviceCount : (w.deviceCount ? '—/' + w.deviceCount : '—')}</td>
+            <td>${webhookStatus(w)}</td>
+            <td>${w.peopleCount ?? '—'}${w.peoplePresence ? ' <span class="subtext">' + escapeHtml(w.peoplePresence) + '</span>' : ''}</td>
+            <td>${w.utilizationPct != null ? w.utilizationPct + '%' : '—'}</td>
+            <td>${w.birthdate ? new Date(w.birthdate).toLocaleDateString() : '—'}</td>
+          </tr>`);
+        if (isOpen) {
+          rows.push(`<tr class="detail-row"><td colspan="8">${renderDetail(w)}</td></tr>`);
+        }
+      });
+
+      document.getElementById('workspace-body').innerHTML = rows.join('')
+        || '<tr><td colspan="8" class="empty">No workspace data yet</td></tr>';
+
+      const withUtil = (data.workspaces || []).filter(w => w.utilizationPct != null).slice(0, 8);
+      document.getElementById('chart').innerHTML = '<h3>7-Day Utilization by Workspace</h3>' + (withUtil.map(w => `
+        <div class="bar-row">
+          <div class="bar-label" title="${escapeHtml(w.name)}">${escapeHtml(w.name)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.min(w.utilizationPct, 100)}%"></div></div>
+          <div class="bar-value">${w.utilizationPct}%</div>
+        </div>`).join('') || '<p class="empty">Run Sync from Control Hub to load utilization metrics.</p>');
+
+      document.getElementById('events').innerHTML = (data.recentEvents || []).map((e) => {
+        const target = [e.workspaceName, e.deviceName].filter(Boolean).join(' · ') || e.workspaceId || 'Unknown';
+        const eid = e.id || `${e.receivedAt}|${e.workspaceId}|${e.deviceId}|${e.type}`;
+        const payloadOpen = openEventIds.has(eid);
+        return `
+          <div class="event-card">
+            <div class="event-head">
+              <time>${new Date(e.receivedAt).toLocaleString()}</time>
+              <span class="badge badge-type">${escapeHtml(e.type || '?')}</span>
+              <span class="event-target">${escapeHtml(target)}</span>
+              <span class="event-summary" title="${escapeHtml(e.summary || '')}">${escapeHtml(e.summary || '')}</span>
+              <button type="button" class="event-toggle" data-event-id="${escapeHtml(eid)}" onclick="event.stopPropagation(); toggleEvent(this.dataset.eventId)">${payloadOpen ? 'Hide' : 'Payload'}</button>
+            </div>
+            <div class="event-body${payloadOpen ? ' open' : ''}" data-event-id="${escapeHtml(eid)}">
+              <pre>${escapeHtml(JSON.stringify(e.payload, null, 2))}</pre>
+            </div>
+          </div>`;
+      }).join('') || '<div class="empty">No webhook events yet</div>';
+    }
+
+    function toggleEvent(id) {
+      if (openEventIds.has(id)) openEventIds.delete(id);
+      else openEventIds.add(id);
+      if (lastData) render(lastData);
+    }
+
+    function exportWebhooks(format) {
+      const path = format === 'csv' ? '/api/export/webhooks.csv' : '/api/export/webhooks.json';
+      window.open(path, '_blank');
+    }
+
+    async function resetData() {
+      if (!confirm('Clear all webhook and API sync data?')) return;
+      expandedIndex = null;
+      openEventIds.clear();
+      await fetch('/api/reset', { method: 'DELETE' });
+      document.getElementById('sync-status').textContent = '';
+      await loadKpis();
+    }
+
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadKpis();
+    setInterval(loadKpis, 3000);
+  </script>
+</body>
+</html>

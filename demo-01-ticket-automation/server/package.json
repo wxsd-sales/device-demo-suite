@@ -1,0 +1,14 @@
+{
+  "name": "demo-01-ticket-automation",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node index.js",
+    "reset": "node reset.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongodb": "^6.12.0"
+  }
+}
