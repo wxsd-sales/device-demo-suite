@@ -142,6 +142,21 @@ For **richer on-device telemetry** (call media, network, xAPI polls), see [demo-
 | GET | `/api/export/webhooks.csv` | CSV download of raw webhooks |
 | DELETE | `/api/reset` | Clear all data |
 
+## Webex API reference
+
+All REST calls use a Service App bearer token against `https://webexapis.com/v1`. The Connect Webhook is configured in Control Hub (not called outbound by this demo).
+
+| API | Method | Endpoint | Used for |
+|-----|--------|----------|----------|
+| [OAuth token](https://developer.webex.com/docs/integrations#using-refresh-tokens) | POST | `/access_token` | Exchange refresh token for access token (startup + every 24h) |
+| [List Workspaces](https://developer.webex.com/docs/api/v1/workspaces/list-workspaces) | GET | `/workspaces` | Workspace names, locations, birthdates |
+| [List Devices](https://developer.webex.com/docs/api/v1/devices/list-devices) | GET | `/devices` | Device health, online/offline, serial, software |
+| [List Locations](https://developer.webex.com/docs/api/v1/locations/list-locations) | GET | `/locations` | Location names for workspace rows |
+| [Workspace Duration Metrics](https://developer.webex.com/docs/api/v1/workspace-duration-metrics/list-workspace-duration-metrics) | GET | `/workspaceDurationMetrics` | 7-day `timeused` / `timebooked` utilization |
+| [Connect Webhook](https://help.webex.com/en-us/article/nj9r68z/Webhooks-for-room-analytics-in-Control-Hub) | — | *(inbound to demo)* | Live people count, presence, temperature, standby, etc. |
+
+Typical scopes: `spark-admin:workspaces_read`, `spark-admin:devices_read`, `spark-admin:locations_read`, plus workspace analytics/metrics scopes as required by your org.
+
 ## Reset
 
 ```bash

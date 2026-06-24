@@ -66,21 +66,33 @@ function formatHealthResults(message, command) {
     callbackNumber = message.CallbackNumber || callbackNumber;
   } else if (command === 'mediachannels call' && message.Channel) {
     const channels = message.Channel;
+    const parsed = [];
     for (let i = 0; i < channels.length; i += 1) {
       try {
         const ch = channels[i];
         let namespace;
+        let flat = {};
         if (ch.Type in ch) {
           namespace = [ch.Type, ch[ch.Type].ChannelRole, ch.Direction].join('_');
-          message[namespace] = Object.assign({}, ch.Netstat, ch[ch.Type]);
+          flat = Object.assign({}, ch.Netstat, ch[ch.Type]);
         } else {
           namespace = [ch.Type, ch.Direction].join('_');
-          message[namespace] = Object.assign({}, ch.Netstat);
+          flat = Object.assign({}, ch.Netstat);
         }
+        message[namespace] = flat;
+        parsed.push({
+          id: namespace,
+          type: ch.Type,
+          direction: ch.Direction,
+          role: ch[ch.Type]?.ChannelRole || null,
+          netstat: ch.Netstat || {},
+          media: ch[ch.Type] || {},
+        });
       } catch (err) {
         console.log(`channel parse error: ${err}`);
       }
     }
+    message.channelsParsed = parsed;
   }
 
   if (callbackNumber) {

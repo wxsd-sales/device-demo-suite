@@ -81,11 +81,11 @@ The macro can coexist with demo-01's report-issue macro (different URLs/ports).
 
 | Poll / event | xAPI command | When |
 |--------------|--------------|------|
-| Call details | `call` | In call (every ~60s) + on connect/disconnect events |
-| Media channels | `mediachannels call` | In call |
+| Call details | `call` | In call (every ~30s) + on connect/disconnect events |
+| Media channels + Netstat | `mediachannels call` | In call — loss, delay, jitter, bitrate, resolution per channel |
 | Room analytics | `roomanalytics` | In call |
-| Network | `network` | Every ~2 min |
-| Standby | `standby` | Every ~2 min |
+| Network (IP, gateway, DNS, link speed) | `network` | Every ~60s |
+| Standby | `standby` | Every ~60s |
 | CallConnected / CallDisconnected | events | Immediate POST |
 
 Tune intervals in the macro `config` block. Shorter intervals = more dashboard activity but more HTTP traffic on the device.
@@ -106,6 +106,25 @@ Tune intervals in the macro `config` block. Shorter intervals = more dashboard a
 | GET | `/api/export/telemetry.json` | Download raw telemetry posts |
 | GET | `/api/export/telemetry.csv` | CSV export |
 | DELETE | `/api/reset` | Clear telemetry collections |
+
+## Webex / RoomOS API reference
+
+This demo does **not** call the Webex REST API (`webexapis.com`). The macro polls **RoomOS xAPI** on the device and POSTs JSON to the demo backend.
+
+| xAPI | Used for |
+|------|----------|
+| `status.get('call')` | Active call state; idle detection |
+| `status.get('mediachannels call')` | Per-channel loss, delay, jitter, bitrate, resolution |
+| `status.get('roomanalytics')` | On-device people count, presence, temperature |
+| `status.get('network')` | IP, gateway, DNS, link speed, LLDP, PoE |
+| `status.get('standby')` | Standby state |
+| `status.get('SystemUnit …')` | Serial, software, product ID |
+| `status.get('Webex DeveloperId')` | Device ID |
+| `status.get('MicrosoftTeams')` | RoomOS vs MTR mode |
+| `Event.CallConnected` / `CallDisconnected` | Immediate call lifecycle posts |
+| `Command.HttpClient.Post` | POST telemetry JSON to demo backend |
+
+Reference: [splunk-hec-macro](https://github.com/wxsd-sales/splunk-hec-macro), [RoomOS macro JavaScript API](https://roomos.cisco.com/doc/TIP-1031)
 
 ## Reset
 

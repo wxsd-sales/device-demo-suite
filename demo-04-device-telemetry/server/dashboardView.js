@@ -1,10 +1,36 @@
 const EVENT_LIMIT = 100;
+const {
+  summarizeNetwork,
+  summarizeMediaChannels,
+  summarizeCall,
+  summarizeStatus,
+} = require('./telemetrySummaries');
+
+function resummarizeFromRaw(command, entry) {
+  if (!entry?.data) return entry?.summary || null;
+  return summarizeStatus(command, entry.data) || entry.summary || null;
+}
+
+function deviceSortKey(doc) {
+  const info = doc.systemInfo || {};
+  return (
+    info.systemSerialNumber
+    || info.systemProductId
+    || doc.deviceKey
+    || info.deviceId
+    || ''
+  ).toString().toLowerCase();
+}
 
 async function buildDashboardView(db) {
-  const [devices, recentEvents] = await Promise.all([
-    db.collection('telemetry_devices').find({}).sort({ lastSeen: -1 }).toArray(),
+  const [deviceDocs, recentEvents] = await Promise.all([
+    db.collection('telemetry_devices').find({}).toArray(),
     db.collection('telemetry_events').find({}).sort({ receivedAt: -1 }).limit(EVENT_LIMIT).toArray(),
   ]);
+
+  deviceDocs.sort((a, b) => deviceSortKey(a).localeCompare(deviceSortKey(b)));
+
+  const devices = deviceDocs;
 
   const inCallDevices = devices.filter((d) => d.inCall).length;
   const lastEvent = recentEvents[0]?.receivedAt || null;
@@ -24,6 +50,14 @@ async function buildDashboardView(db) {
 
 function formatDevice(doc) {
   const byCmd = doc.statusByCommand || {};
+  const network = resummarizeFromRaw('network', byCmd.network);
+  const mediaQuality = resummarizeFromRaw('mediachannels call', byCmd.mediachannels_call)
+    || doc.mediaQuality
+    || null;
+  const activeCall = byCmd.call?.data
+    ? summarizeCall(byCmd.call.data)
+    : (doc.activeCall || null);
+
   return {
     deviceKey: doc.deviceKey,
     firstSeen: doc.firstSeen,
@@ -31,17 +65,21 @@ function formatDevice(doc) {
     inCall: !!doc.inCall,
     systemInfo: doc.systemInfo || {},
     tags: doc.tags,
-    activeCall: doc.activeCall || null,
-    network: byCmd.network?.summary || null,
+    activeCall: activeCall?.inCall ? activeCall : null,
+    network,
     roomAnalytics: byCmd.roomanalytics?.summary || null,
     standby: byCmd.standby?.summary || null,
-    mediaChannels: byCmd.mediachannels_call?.summary || null,
+    mediaQuality,
     lastEvent: doc.lastEvent || null,
     statusKeys: Object.keys(byCmd),
   };
 }
 
 function formatEvent(doc) {
+  const summary = doc.command && doc.deviceData
+    ? (summarizeStatus(doc.command, doc.deviceData) || doc.summary)
+    : doc.summary;
+
   return {
     id: doc._id?.toString(),
     receivedAt: doc.receivedAt,
@@ -49,7 +87,7 @@ function formatEvent(doc) {
     kind: doc.kind,
     command: doc.command,
     eventName: doc.kind === 'event' ? (doc.rawPayload?.eventName || doc.command) : null,
-    summary: doc.summary,
+    summary,
     systemInfo: doc.systemInfo,
     deviceData: doc.deviceData,
   };

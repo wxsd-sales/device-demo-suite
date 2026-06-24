@@ -89,6 +89,22 @@ Or click **Reset All Tickets** in the Fake Helix UI.
 | PATCH | `/api/tickets/:id` | Update status (open/acknowledged/resolved) |
 | DELETE | `/api/tickets` | Clear all tickets |
 
+## Webex / RoomOS API reference
+
+This demo does **not** call the Webex REST API (`webexapis.com`). Data is collected on the device via **RoomOS xAPI** inside the macro:
+
+| xAPI | Used for |
+|------|----------|
+| `Status.SystemUnit` (Software, ProductId, SerialNumber) | Device identity in ticket payload |
+| `Status.Webex.DeveloperId` | Device ID |
+| `Status.Call` | Active call details at submit time |
+| `Status.Conference.Call` | Conference legs |
+| `Status.Bookings.Current.Id` | Current booking ID |
+| `Command.HttpClient.Post` | POST structured JSON to demo backend |
+| `Event.UserInterface.*` | Touch UI panel and form input |
+
+Reference: [RoomOS macro JavaScript API](https://roomos.cisco.com/doc/TIP-1031)
+
 ## Troubleshooting
 
 - **Device shows error on submit:** Verify `serviceUrl` is reachable from device; test with ngrok; check firewall

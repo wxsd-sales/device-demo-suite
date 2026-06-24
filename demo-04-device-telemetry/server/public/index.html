@@ -39,6 +39,15 @@
     .metric-grid dt { color: #64748b; margin: 0; }
     .metric-grid dd { margin: 0; color: #e2e8f0; word-break: break-word; }
     .section-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin: 0.75rem 0 0.35rem; }
+    .channel-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; margin-top: 0.35rem; }
+    .channel-table th, .channel-table td { padding: 0.4rem 0.45rem; text-align: left; border-bottom: 1px solid #2d3a4d; }
+    .channel-table th { color: #64748b; font-weight: 600; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .channel-table td { color: #e2e8f0; }
+    .channel-table tr:last-child td { border-bottom: none; }
+    .metric-warn { color: #fbbf24; font-weight: 600; }
+    .metric-bad { color: #f87171; font-weight: 600; }
+    .quality-summary { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.35rem; }
+    .quality-summary span strong { color: #cbd5e1; }
     .events { background: #1a2332; border: 1px solid #2d3a4d; border-radius: 8px; padding: 1rem; }
     .events h3 { margin: 0 0 0.75rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; }
     .event-row { border-bottom: 1px solid #243044; padding: 0.65rem 0; font-size: 0.8rem; }
@@ -117,6 +126,8 @@
       const serial = info.systemSerialNumber || '—';
       const sw = info.softwareVersion || '—';
       const mode = info.systemMode || 'RoomOS';
+      const net = d.network;
+      const mq = d.mediaQuality;
 
       return `
         <article class="device-card">
@@ -136,26 +147,35 @@
               <div class="section-label">Active call</div>
               <dl class="metric-grid">
                 <dt>Display</dt><dd>${escapeHtml(d.activeCall.displayName || '—')}</dd>
+                <dt>Remote party</dt><dd>${escapeHtml(d.activeCall.remoteParty || '—')}</dd>
                 <dt>Protocol</dt><dd>${escapeHtml(d.activeCall.protocol || '—')}</dd>
+                <dt>Status</dt><dd>${escapeHtml(d.activeCall.status || '—')}</dd>
                 <dt>Callback</dt><dd>${escapeHtml(d.activeCall.callbackNumber || '—')}</dd>
               </dl>` : ''}
-            ${d.network ? `
+            ${mq && mq.channels?.length ? renderMediaQuality(mq) : (d.inCall ? '<p class="empty">Waiting for mediachannels call poll…</p>' : '')}
+            ${net ? `
               <div class="section-label">Network</div>
               <dl class="metric-grid">
-                <dt>Ethernet</dt><dd>${fmtBool(d.network.ethernetConnected)}</dd>
-                <dt>Wi‑Fi</dt><dd>${fmtBool(d.network.wifiConnected)}</dd>
-                <dt>DNS</dt><dd>${escapeHtml(d.network.dnsStatus || '—')}</dd>
+                <dt>Active link</dt><dd>${escapeHtml(net.activeInterface || '—')}</dd>
+                <dt>Hostname</dt><dd>${escapeHtml(net.fqdn || '—')}</dd>
+                <dt>IPv4</dt><dd>${escapeHtml(net.ethernetIp || net.ipv4Address || '—')}</dd>
+                <dt>Subnet</dt><dd>${escapeHtml(net.ethernetSubnet || '—')}</dd>
+                <dt>Gateway</dt><dd>${escapeHtml(net.ethernetGateway || net.ipv4Gateway || '—')}</dd>
+                <dt>DNS servers</dt><dd>${escapeHtml(net.dnsServers || '—')}</dd>
+                <dt>DNS domain</dt><dd>${escapeHtml(net.dnsDomain || '—')}</dd>
+                <dt>Ethernet</dt><dd>${fmtLink(net)}</dd>
+                <dt>MAC</dt><dd>${escapeHtml(net.ethernetMac || '—')}</dd>
+                <dt>Wi‑Fi</dt><dd>${fmtWifi(net)}</dd>
+                ${net.lldpNeighbor ? `<dt>LLDP neighbor</dt><dd>${escapeHtml(net.lldpNeighbor)}</dd>` : ''}
+                ${net.poePower ? `<dt>PoE</dt><dd>${escapeHtml(String(net.poePower))} mW</dd>` : ''}
               </dl>` : ''}
             ${d.roomAnalytics ? `
-              <div class="section-label">Room analytics (on-device)</div>
+              <div class="section-label">Room analytics</div>
               <dl class="metric-grid">
                 <dt>People</dt><dd>${fmt(d.roomAnalytics.peopleCount)} ${d.roomAnalytics.peoplePresence ? '(' + escapeHtml(d.roomAnalytics.peoplePresence) + ')' : ''}</dd>
-                <dt>Temp</dt><dd>${d.roomAnalytics.ambientTemperature != null ? d.roomAnalytics.ambientTemperature + '°' : '—'}</dd>
-                <dt>Humidity</dt><dd>${d.roomAnalytics.relativeHumidity != null ? d.roomAnalytics.relativeHumidity + '%' : '—'}</dd>
+                <dt>Temp / humidity</dt><dd>${d.roomAnalytics.ambientTemperature != null ? d.roomAnalytics.ambientTemperature + '°' : '—'} / ${d.roomAnalytics.relativeHumidity != null ? d.roomAnalytics.relativeHumidity + '%' : '—'}</dd>
+                <dt>Noise / sound</dt><dd>${fmt(d.roomAnalytics.ambientNoise)} / ${fmt(d.roomAnalytics.soundLevel)}</dd>
               </dl>` : ''}
-            ${d.mediaChannels?.channelCount ? `
-              <div class="section-label">Media channels</div>
-              <dl class="metric-grid"><dt>Channels</dt><dd>${d.mediaChannels.channelCount}</dd></dl>` : ''}
             ${d.standby ? `
               <div class="section-label">Standby</div>
               <dl class="metric-grid"><dt>State</dt><dd>${escapeHtml(d.standby.standbyState || '—')}</dd></dl>` : ''}
@@ -167,6 +187,71 @@
               </dl>` : ''}
           </div>
         </article>`;
+    }
+
+    function renderMediaQuality(mq) {
+      const rows = (mq.channels || []).map((ch) => {
+        const m = ch.metrics || {};
+        return `<tr>
+          <td>${escapeHtml([ch.type, ch.role, ch.direction].filter(Boolean).join(' · '))}</td>
+          <td>${fmtMetric(m.loss, '%', 5, 15)}</td>
+          <td>${fmtMetric(m.delay, ' ms', 150, 300)}</td>
+          <td>${fmtMetric(m.jitter, ' ms', 30, 60)}</td>
+          <td>${fmt(ch.bitrate || ch.metrics?.bitrate)}</td>
+          <td>${escapeHtml(ch.resolution || '—')}</td>
+          <td>${fmt(ch.frameRate)}</td>
+        </tr>`;
+      }).join('');
+
+      return `
+        <div class="section-label">Call quality (media channels)</div>
+        <div class="quality-summary">
+          <span><strong>${mq.channelCount}</strong> channels</span>
+          ${mq.worstLoss != null ? `<span>Max loss <strong class="${qualityClass(mq.worstLoss, 5, 15)}">${mq.worstLoss}%</strong></span>` : ''}
+          ${mq.maxDelay != null ? `<span>Max delay <strong class="${qualityClass(mq.maxDelay, 150, 300)}">${mq.maxDelay} ms</strong></span>` : ''}
+          ${mq.maxJitter != null ? `<span>Max jitter <strong class="${qualityClass(mq.maxJitter, 30, 60)}">${mq.maxJitter} ms</strong></span>` : ''}
+        </div>
+        <table class="channel-table">
+          <thead><tr>
+            <th>Channel</th><th>Loss</th><th>Delay</th><th>Jitter</th><th>Bitrate</th><th>Resolution</th><th>FPS</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    function fmtLink(net) {
+      if (!net.ethernetConnected) return 'Down';
+      const parts = ['Connected'];
+      if (net.ethernetSpeed) parts.push(net.ethernetSpeed);
+      if (net.ethernetDuplex) parts.push(net.ethernetDuplex);
+      return parts.join(' · ');
+    }
+
+    function fmtWifi(net) {
+      if (net.wifiConnected) {
+        const parts = ['Connected'];
+        if (net.wifiSsid) parts.push(net.wifiSsid);
+        if (net.wifiSignal != null) parts.push(`RSSI ${net.wifiSignal}`);
+        if (net.wifiIp) parts.push(net.wifiIp);
+        return parts.join(' · ');
+      }
+      if (net.ethernetConnected) {
+        return net.wifiStatus ? `Not in use (${net.wifiStatus})` : 'Not in use';
+      }
+      return net.wifiStatus || 'Down';
+    }
+
+    function qualityClass(value, warn, bad) {
+      if (value == null || Number.isNaN(value)) return '';
+      if (value >= bad) return 'metric-bad';
+      if (value >= warn) return 'metric-warn';
+      return '';
+    }
+
+    function fmtMetric(value, suffix, warn, bad) {
+      if (value == null || value === '') return '—';
+      const cls = qualityClass(parseFloat(value), warn, bad);
+      return `<span class="${cls}">${escapeHtml(String(value))}${suffix && !String(value).includes(suffix.trim()) ? suffix : ''}</span>`;
     }
 
     function renderEvent(e) {
@@ -193,10 +278,18 @@
 
     function eventSummary(e) {
       if (e.summary) {
-        if (e.summary.inCall) return `Call: ${e.summary.displayName || e.summary.callbackNumber || 'active'}`;
-        if (e.summary.peopleCount != null) return `People: ${e.summary.peopleCount}`;
-        if (e.summary.channelCount != null) return `Channels: ${e.summary.channelCount}`;
-        if (e.summary.standbyState) return `Standby: ${e.summary.standbyState}`;
+        const s = e.summary;
+        if (s.inCall) return `Call: ${s.displayName || s.callbackNumber || 'active'}`;
+        if (s.channels?.length) {
+          const loss = s.worstLoss != null ? ` loss ${s.worstLoss}%` : '';
+          const delay = s.maxDelay != null ? ` delay ${s.maxDelay}ms` : '';
+          return `${s.channelCount} channels${loss}${delay}`;
+        }
+        if (s.activeInterface || s.ethernetIp || s.wifiIp) {
+          return `Network: ${s.activeInterface || 'link'} ${s.ethernetIp || s.wifiIp || ''}`.trim();
+        }
+        if (s.peopleCount != null) return `People: ${s.peopleCount}`;
+        if (s.standbyState) return `Standby: ${s.standbyState}`;
       }
       return e.kind === 'event' ? 'Device event' : 'Status snapshot';
     }
@@ -220,7 +313,6 @@
     }
 
     function fmt(v) { return v != null && v !== '' ? v : '—'; }
-    function fmtBool(v) { return v === true ? 'Connected' : v === false ? 'Down' : '—'; }
     function fmtDate(v) { return v ? new Date(v).toLocaleString() : '—'; }
     function fmtTime(v) { return v ? new Date(v).toLocaleTimeString() : '—'; }
     function escapeHtml(str) {

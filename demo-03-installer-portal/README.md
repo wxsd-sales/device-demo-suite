@@ -91,6 +91,24 @@ Open `http://localhost:3003` — best viewed on a phone-sized browser window.
 
 Responses are cached for 30 seconds (cache cleared after workspace create/delete).
 
+## Webex API reference
+
+All REST calls use a Service App bearer token against `https://webexapis.com/v1`.
+
+| API | Method | Endpoint | Used for |
+|-----|--------|----------|----------|
+| [OAuth token](https://developer.webex.com/docs/integrations#using-refresh-tokens) | POST | `/access_token` | Exchange refresh token for access token (startup + every 24h) |
+| [List Locations](https://developer.webex.com/docs/api/v1/locations/list-locations) | GET | `/locations` | Location picker |
+| [List Workspaces](https://developer.webex.com/docs/api/v1/workspaces/list-workspaces) | GET | `/workspaces` | Workspaces per location, device counts |
+| [Create a Workspace](https://developer.webex.com/docs/api/v1/workspaces/create-a-workspace) | POST | `/workspaces` | Create empty workspace for provisioning |
+| [Delete a Workspace](https://developer.webex.com/docs/api/v1/workspaces/delete-a-workspace) | DELETE | `/workspaces/{workspaceId}` | Remove empty demo workspaces |
+| [List Devices](https://developer.webex.com/docs/api/v1/devices/list-devices) | GET | `/devices` | Devices in a workspace; empty-workspace check |
+| [Create a Device Activation Code](https://developer.webex.com/docs/api/v1/devices/create-a-device-activation-code) | POST | `/devices/activationCode` | Registration code for empty workspaces |
+| [List People](https://developer.webex.com/docs/api/v1/people/list-people) | GET | `/people` | Org directory sample (home page) |
+| [List Groups](https://developer.webex.com/docs/api/v1/groups/list-groups) | GET | `/groups` | Org directory sample (home page) |
+
+Typical scopes: `spark-admin:workspaces_read`, `spark-admin:workspaces_write`, `spark-admin:telephony_config_write`, `spark-admin:devices_read`, `spark-admin:devices_write`, `identity:placeonetimepassword_create`, `spark-admin:people_read`, `spark-admin:groups_read`.
+
 ## Troubleshooting
 
 - **Failed to fetch locations:** Verify OAuth env vars and Service App scopes
