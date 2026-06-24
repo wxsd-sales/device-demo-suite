@@ -2,6 +2,8 @@
 
 Built around Webex Control Hub APIs and RoomOS devices. Each demo lives in its own folder and can run independently.
 
+[![Vidcast Overview](https://github.com/user-attachments/assets/6f7d6981-cafd-402c-aef5-667db2e801af)](https://app.vidcast.io/share/974c1f11-ac35-4a7a-bee6-0df9c4384cb3)
+
 ## Demos
 
 | Demo | Folder | Port | Description |
@@ -64,6 +66,16 @@ cd demo-02-kpi-dashboard/server && npm run reset
 cd demo-04-device-telemetry/server && npm run reset
 ```
 
+## License
+
+All contents are licensed under the MIT license. Please see [license](LICENSE) for details.
+
 ## Disclaimer
 
-Demo and proof-of-concept code only. Not for production use. Do not commit `.env` files or credentials.
+<!-- Keep the following here -->  
+Everything included is for demo and Proof of Concept purposes only. Use of the site is solely at your own risk. This site may contain links to third party content, which we do not warrant, endorse, or assume liability for. These demos are for Cisco Webex usecases, but are not Official Cisco Webex Branded demos.
+ 
+ 
+## Support
+
+Please contact the Webex SD team at [wxsd@external.cisco.com](mailto:wxsd@external.cisco.com?subject=DeviceDemoSuite) for questions. Or for Cisco internal, reach out to us on Webex App via our bot globalexpert@webex.bot & choose "Engagement Type: API/SDK Proof of Concept Integration Development". 
